@@ -18,13 +18,40 @@ st.title("DASHBOARD DE VENDAS :shopping_trolley:")
 
 # Importar os dados de uma API
 url = 'https://labdados.com/produtos'
-response = requests.get(url)
+regioes = ['Brasil', 'Centro-Oeste', 'Nordeste', 'Norte', 'Sudeste', 'Sul']
+
+st.sidebar.title('Filtros')
+
+# Label e dados
+regiao = st.sidebar.selectbox('Região', regioes)
+
+if regiao == 'Brasil':
+    regiao = ''
+
+todos_anos = st.sidebar.checkbox('Dados de todo o período', value=True)
+
+if todos_anos:
+    ano = ''
+else:
+    ano = st.sidebar.slider('Ano', 2020, 2023)
+
+query_string = {
+    'regiao': regiao.lower(),
+    'ano': ano
+}
+
+response = requests.get(url, params=query_string)
 
 # Transformar o JSON em um data frame
 dados = pd.DataFrame.from_dict(response.json())
 
 # Ajustar o formato da coluna de datas
 dados['Data da Compra'] = pd.to_datetime(dados['Data da Compra'], format='%d/%m/%Y')
+
+filtro_vendedores = st.sidebar.multiselect('Vendedores', dados['Vendedor'].unique())
+
+if filtro_vendedores:
+    dados = dados[dados['Vendedor'].isin(filtro_vendedores)]
 
 #----------- Tabelas
 
@@ -35,7 +62,7 @@ receita_estados = dados.groupby('Local da compra')[['Preço']].sum()
 receita_estados = dados.drop_duplicates(subset='Local da compra')[['Local da compra', 'lat', 'lon']].merge(receita_estados, left_on='Local da compra', right_index= True).sort_values('Preço', ascending=False)
 
 #Tabela com a receita mensal 
-receita_mensal = dados.set_index('Data da Compra').groupby(pd.Grouper(freq= 'M'))['Preço'].sum().reset_index()
+receita_mensal = dados.set_index('Data da Compra').groupby(pd.Grouper(freq= 'ME'))['Preço'].sum().reset_index()
 receita_mensal['Ano'] = receita_mensal['Data da Compra'].dt.year
 receita_mensal['Mes'] = receita_mensal['Data da Compra'].dt.month_name()
 
@@ -49,7 +76,7 @@ vendas_estado = dados.groupby('Local da compra')[['Preço']].count()
 vendas_estado = dados.drop_duplicates(subset='Local da compra')[['Local da compra', 'lat', 'lon']].merge(vendas_estado, left_on='Local da compra', right_index= True).sort_values('Preço', ascending=False)
 
 #Quantidade de vendas mensais
-vendas_mensal = dados.set_index('Data da Compra').groupby(pd.Grouper(freq= 'M'))['Preço'].count().reset_index()
+vendas_mensal = dados.set_index('Data da Compra').groupby(pd.Grouper(freq= 'ME'))['Preço'].count().reset_index()
 vendas_mensal['Ano'] = vendas_mensal['Data da Compra'].dt.year
 vendas_mensal['Mes'] = vendas_mensal['Data da Compra'].dt.month_name()
 
@@ -141,7 +168,7 @@ fig_vendas_categorias.update_layout(yaxis_title = 'Vendas')
 
 #----------- Viualização
 
-aba1, aba2, aba3, aba4 = st.tabs(['Receita', 'Quantidade de vendas', 'Vendedores', 'Dados'])
+aba1, aba2, aba3 = st.tabs(['Receita', 'Quantidade de vendas', 'Vendedores'])
 
 
 
@@ -191,8 +218,3 @@ with aba3:
                                         text_auto=True,
                                         title= f'Top {quantidade_vendedores} vendedores (Vendas)')
         st.plotly_chart(fig_vendas_vendedores) 
-with aba4:
-# Adicinado o dataframe ao dashboard
-    st.dataframe(dados)
-
-
